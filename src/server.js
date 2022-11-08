@@ -1,11 +1,16 @@
 const express = require("express")
 const multer = require("multer")
+const path = require("path")
 const bodyParser = require("body-parser")
 const app = express()
+const handlebars = require("express-handlebars")
 const {Router} = require("express")
 const {appendFile} = require("fs")
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(express.json())
+app.engine("handlebars",handlebars.engine())
+app.set("views",path.join(__dirname,"views"))
+app.set("view engine","handlebars")
 
 //Port of the server
 const PORT = 8080
@@ -19,7 +24,8 @@ const routerContainer = require("./routerClass")
 const { nextTick } = require("process")
 const routerClass = new routerContainer()
 
-app.use(express.static("public"))
+//app.use(express.static("../public"))
+app.use(express.static("../uploads"));
 
 //Server listener
 app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
@@ -30,7 +36,7 @@ const routerProducts = Router()
 //multer storage
 let storage = multer.diskStorage({
   destination:(req,file,callback)=>{
-    callback(null,"uploads")
+    callback(null,"../uploads")
   },
   filename:(req,file,callback)=>{
     callback(null,Date.now() + "-" + file.fieldname + file.originalname)
@@ -41,7 +47,7 @@ const upload = multer({storage})
 
 //Index of the page
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html')
+  res.render("home")
 });
 
 //Delete a product by id
@@ -93,8 +99,9 @@ routerProducts.get("/",async(req,res)=>{
 
 //Get all the products from the class
 app.get("/productos",async (req,res)=>{
-  const allProducts = await ContainerClass.getAll()
-  res.json(allProducts)
+  const allProducts = await routerClass.getAll()
+  res.render("products",{allProducts})
+  //res.json(allProducts)
 })
 
 //Get a random product from the class
