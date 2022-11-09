@@ -4,13 +4,16 @@ const path = require("path")
 const bodyParser = require("body-parser")
 const app = express()
 const handlebars = require("express-handlebars")
-const {Router} = require("express")
-const {appendFile} = require("fs")
+
+
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(express.json())
 app.engine("handlebars",handlebars.engine())
 app.set("views",path.join(__dirname,"views"))
 app.set("view engine","handlebars")
+app.use(express.static("../uploads"));
+//app.use(express.static("../public"))
+
 
 //Port of the server
 const PORT = 8080
@@ -24,14 +27,11 @@ const routerContainer = require("./routerClass")
 const { nextTick } = require("process")
 const routerClass = new routerContainer()
 
-//app.use(express.static("../public"))
-app.use(express.static("../uploads"));
-
 //Server listener
 app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
 
 //Products router
-const routerProducts = Router()
+const routerProducts = express.Router()
 
 //multer storage
 let storage = multer.diskStorage({
@@ -78,7 +78,7 @@ routerProducts.post("/" , upload.single("myFile") , async(req,res,next)=>{
     return next(error)
   }
   const newProductId = await routerClass.save({title,price,file})
-  res.json({title,price,file,id:newProductId})
+  res.render("home")
 })
 
 //Get one item from the routerProducts
@@ -100,8 +100,11 @@ routerProducts.get("/",async(req,res)=>{
 //Get all the products from the class
 app.get("/productos",async (req,res)=>{
   const allProducts = await routerClass.getAll()
-  res.render("products",{allProducts})
-  //res.json(allProducts)
+  if(allProducts.length){
+    res.render("products",{allProducts})
+  }else{
+    res.render("productsEmpty")
+  }
 })
 
 //Get a random product from the class
