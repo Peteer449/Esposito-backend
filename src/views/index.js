@@ -9,7 +9,6 @@ let price = document.getElementById("price")
 let image = document.getElementById("image")
 let user = ""
 
-
 if(user===""){
   Swal.fire({
     title:"Bienvenido",
