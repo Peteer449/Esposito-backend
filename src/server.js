@@ -1,5 +1,7 @@
+const fs = require("fs")
 const express = require("express")
 const multer = require("multer")
+const {Server} = require("socket.io")
 const path = require("path")
 const bodyParser = require("body-parser")
 const app = express()
@@ -12,23 +14,38 @@ app.engine("handlebars",handlebars.engine())
 app.set("views",path.join(__dirname,"views"))
 app.set("view engine","handlebars")
 app.use(express.static("../uploads"));
-//app.use(express.static("../public"))
+app.use(express.static("./views"))
 
 
 //Port of the server
-const PORT = 8080
+const PORT = process.env.PORT || 8080
 
-//Import class 
+//Import classes
 const ContainerProducts = require("./class")
 const ContainerClass = new ContainerProducts()
-
-//import routerClass
 const routerContainer = require("./routerClass")
 const { nextTick } = require("process")
 const routerClass = new routerContainer()
+const ChatContainer = require("./chatClass")
+const chatClass = new ChatContainer()
 
 //Server listener
-app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
+const server = app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
+
+//Create websocket server
+const io = new Server(server)
+
+io.on("connection",async (socket)=>{
+  socket.emit("allMessages",await chatClass.getAll())
+  socket.emit("allProducts",await routerClass.getAll())
+  socket.on("chatInput",async data=>{
+    io.sockets.emit("allMessages", await chatClass.save(data))
+  })
+  socket.on("addProduct",data=>{
+    routerClass.save(data)
+    io.sockets.emit("allProducts",routerClass.getAll())
+  })
+})
 
 //Products router
 const routerProducts = express.Router()
@@ -78,7 +95,7 @@ routerProducts.post("/" , upload.single("myFile") , async(req,res,next)=>{
     return next(error)
   }
   const newProductId = await routerClass.save({title,price,file})
-  res.render("home")
+  //res.render("home")
 })
 
 //Get one item from the routerProducts
