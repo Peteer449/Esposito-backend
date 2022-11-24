@@ -61,7 +61,7 @@ routerProducts.post("/", (req,res)=>{
   const image = req.body.image
   const code = req.body.code
   console.log(JSON.stringify(req.body),title,description,price,stock,code,image)
-  productClass.save({title,description,time:new Date(),price,stock,code,image})
+  productClass.save({title,description,time:new Date().toLocaleTimeString(),price,stock,code,image})
   const allProducts = productClass.getAll()
   if(allProducts.length){
     res.render("products",{allProducts})
@@ -97,7 +97,7 @@ routerCart.post("/",async(req,res)=>{
 })
 
 routerCart.delete("/:id",async(req,res)=>{
-  await cartClass.deleteCart()
+  await cartClass.deleteCart(req.params.id)
 })
 
 routerCart.get("/:id/productos",async(req,res)=>{
