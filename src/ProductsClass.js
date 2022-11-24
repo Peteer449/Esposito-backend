@@ -1,9 +1,8 @@
 let products = []
 
-class Container{
+class Products{
   save(object){
     products.push({...object,id:products.length+1})
-    return(products.length)
   }
   getById(id){
     const object=products.find(e=>e.id===id)
@@ -22,4 +21,4 @@ class Container{
   }
 }
 
-module.exports = Container
+module.exports = Products

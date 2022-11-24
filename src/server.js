@@ -1,19 +1,16 @@
-const fs = require("fs")
 const express = require("express")
-const multer = require("multer")
-const {Server} = require("socket.io")
 const path = require("path")
 const bodyParser = require("body-parser")
 const app = express()
 const handlebars = require("express-handlebars")
 
+const isAdmin = true
 
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(express.json())
 app.engine("handlebars",handlebars.engine())
 app.set("views",path.join(__dirname,"views"))
 app.set("view engine","handlebars")
-app.use(express.static("../uploads"));
 app.use(express.static("./views"))
 
 
@@ -21,117 +18,127 @@ app.use(express.static("./views"))
 const PORT = process.env.PORT || 8080
 
 //Import classes
-const ContainerProducts = require("./class")
-const ContainerClass = new ContainerProducts()
-const routerContainer = require("./routerClass")
-const { nextTick } = require("process")
-const routerClass = new routerContainer()
-const ChatContainer = require("./chatClass")
-const chatClass = new ChatContainer()
+const ProductsClass = require("./ProductsClass")
+const productClass = new ProductsClass()
+const CartClass = require("./CartClass")
+const cartClass = new CartClass()
 
 //Server listener
 const server = app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
 
-//Create websocket server
-const io = new Server(server)
-
-io.on("connection",async (socket)=>{
-  socket.emit("allMessages",await chatClass.getAll())
-  socket.emit("allProducts",await routerClass.getAll())
-  socket.on("chatInput",async data=>{
-    io.sockets.emit("allMessages", await chatClass.save(data))
-  })
-  socket.on("addProduct",data=>{
-    routerClass.save(data)
-    io.sockets.emit("allProducts",routerClass.getAll())
-  })
-})
-
-//Products router
+//Routers
 const routerProducts = express.Router()
-
-//multer storage
-let storage = multer.diskStorage({
-  destination:(req,file,callback)=>{
-    callback(null,"../uploads")
-  },
-  filename:(req,file,callback)=>{
-    callback(null,Date.now() + "-" + file.fieldname + file.originalname)
-  }
-})
-
-const upload = multer({storage})
+const routerCart = express.Router()
 
 //Index of the page
 app.get('/', (req, res) => {
   res.render("home")
 });
 
+app.get("*",(req,res) => {
+  res.json({"error":"Ruta no implementada"})
+})
+
 //Delete a product by id
 routerProducts.delete("/:id",async(req,res)=>{
-  const id = req.params.id
-  await routerClass.deleteById(parseInt(id))
-  const allProducts = await routerClass.getAll()
-  res.json(allProducts)
+  if(isAdmin){
+    const id = req.params.id
+    await productClass.deleteById(parseInt(id))
+    const allProducts = await productClass.getAll()
+    res.json(allProducts)
+  }else{
+    res.json({"error":"No tienes permiso de administrador"})
+  }
 })
 
 //Update a product by id
 routerProducts.put("/:id",async(req,res)=>{
-  const id =  req.params.id
-  const product = await routerClass.getById(parseInt(id))
-  product.actualizado = "Actualizado"
-  const allProducts = await routerClass.getAll()
-  res.json(allProducts)
+  if(isAdmin){
+    const id =  req.params.id
+    const product = await productClass.getById(parseInt(id))
+    product.actualizado = "Actualizado"
+    const allProducts = await productClass.getAll()
+    res.json(allProducts)
+  }else{
+    res.json({"error":"No tienes permiso de administrador"})
+  }
 })
 
 //Add a new item in routerProducts
-routerProducts.post("/" , upload.single("myFile") , async(req,res,next)=>{
-  const title = req.body.title
-  const price = req.body.price
-  const file = req.file
-  if(!file){
-    const error = new Error("Archivo vacio")
-    error.httpStatusCode = 400
-    return next(error)
+routerProducts.post("/", (req,res)=>{
+  if(isAdmin){
+    const title = req.body.title
+    const description = req.body.description
+    const price = req.body.price
+    const stock = req.body.stock
+    const image = req.body.image
+    const code = req.body.code
+    productClass.save({title,description,time:new Date().toLocaleTimeString(),price,stock,code,image})
+    const allProducts = productClass.getAll()
+    /*if(allProducts.length){
+      res.render("products",{allProducts})
+    }else{
+      res.render("productsEmpty")
+    }*/
+    res.json(allProducts)
+  }else{
+    res.json({"error":"No tienes permiso de administrador"})
   }
-  const newProductId = await routerClass.save({title,price,file})
-  //res.render("home")
 })
 
 //Get one item from the routerProducts
-routerProducts.get("/:id",async(req,res)=>{
+routerProducts.get("/:id?",async(req,res)=>{
   const id = req.params.id
-  const product = await routerClass.getById(parseInt(id))
-  if(!product){
-    res.json({error:'producto no encontrado'})
-  }
-  res.json(product)
-})
-
-//Get all the products from the router class
-routerProducts.get("/",async(req,res)=>{
-  const allProducts = await routerClass.getAll()
-  res.json(allProducts)
-})
-
-//Get all the products from the class
-app.get("/productos",async (req,res)=>{
-  const allProducts = await routerClass.getAll()
-  if(allProducts.length){
-    res.render("products",{allProducts})
+  if(id){
+    const product = await productClass.getById(parseInt(id))
+    if(!product){
+      res.json({error:'producto no encontrado'})
+    }
+    res.json(product)
   }else{
-    res.render("productsEmpty")
+    const allProducts = await productClass.getAll()
+    /*if(allProducts.length){
+      res.render("products",{allProducts})
+    }else{
+      res.render("productsEmpty")
+    }*/
+    res.json(allProducts)
   }
 })
 
-//Get a random product from the class
-app.get("/productoRandom",async (req,res)=>{
-  const allProducts = await ContainerClass.getAll()
-  const randomId = Math.ceil(Math.random() * allProducts.length)
-  const productRandom = await ContainerClass.getById(randomId)
-  console.log(randomId)
-  res.json(productRandom)
+
+
+
+routerCart.post("/",async(req,res)=>{
+  let id = await cartClass.createCart()
+  res.json(id)
 })
+
+routerCart.delete("/:id",async(req,res)=>{
+  await cartClass.deleteCart(parseInt(req.params.id))
+  res.json(await cartClass.getCart())
+})
+
+routerCart.get("/:id/productos",async(req,res)=>{
+  res.json(await cartClass.getCart())
+})
+
+routerCart.post("/:id/productos/:id_prod",async(req,res)=>{
+  let id_prod = req.params.id_prod
+  let id_cart = req.params.id
+  let product = await productClass.getById(parseInt(id_prod))
+  await cartClass.saveProduct(id_cart,product)
+  res.json(await cartClass.getCart())
+})
+
+routerCart.delete("/:id/productos/:id_prod",async(req,res)=>{
+  let id_prod = req.params.id_prod
+  let id_cart = req.params.id
+  await cartClass.deleteById(id_cart, id_prod)
+  res.json(await cartClass.getCart())
+})
+
 
 //Define the path of the router
 app.use("/api/productos", routerProducts)
+app.use("/api/carrito",routerCart)
