@@ -3,7 +3,6 @@ let chatInput = document.getElementById("chatInput")
 let chatForm = document.getElementById("chatForm")
 let productsTable = document.getElementById("productsTable")
 let productForm = document.getElementById("productForm")
-let id = 1
 let title = document.getElementById("title")
 let price = document.getElementById("price")
 let image = document.getElementById("image")
@@ -37,16 +36,8 @@ socket.on("allMessages",data=>{
 
 productForm.addEventListener("submit",event=>{
   event.preventDefault()
-  console.log(image)
-  socket.emit("addProduct",{id,title:title.value,price:price.value,image:image.value})
-  id++
+  socket.emit("addProduct",{title:title.value,price:price.value,image:image.value})
 })
-
-image.addEventListener("change",FileChosen)
-let SelectedFile;
-function FileChosen(evnt) {
-  SelectedFile = evnt.target.files[0];
-}
 
 socket.on("allProducts",data=>{
   productsTable.innerHTML=""
