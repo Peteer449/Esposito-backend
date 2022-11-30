@@ -18,17 +18,32 @@ app.use(express.static("./views"))
 const PORT = process.env.PORT || 8080
 
 //Import classes
-const ProductsClass = require("./ProductsClass")
-const productClass = new ProductsClass()
-const CartClass = require("./CartClass")
-const cartClass = new CartClass()
+const productsContainer = require("./productsSQL")
+const productsClass = new productsContainer()
+const ChatContainer = require("./chatSQLite")
+const chatClass = new ChatContainer()
 
 //Server listener
 const server = app.listen(PORT,()=>console.log(`Server listening on port ${PORT}`))
 
-//Routers
+//Create websocket server
+const io = new Server(server)
+
+io.on("connection",async (socket)=>{
+  socket.emit("allMessages",await chatClass.getAll())
+  socket.emit("allProducts",await productsClass.getAll())
+  socket.on("chatInput",async data=>{
+    await chatClass.save(data)
+    io.sockets.emit("allMessages",await chatClass.getAll())
+  })
+  socket.on("addProduct",async data=>{
+    await productsClass.save(data)
+    io.sockets.emit("allProducts",await productsClass.getAll())
+  })
+})
+
+//Products router
 const routerProducts = express.Router()
-const routerCart = express.Router()
 
 //Index of the page
 app.get('/', (req, res) => {
@@ -41,94 +56,42 @@ app.get("*",(req,res) => {
 
 //Delete a product by id
 routerProducts.delete("/:id",async(req,res)=>{
-  if(isAdmin){
-    const id = req.params.id
-    await productClass.deleteById(parseInt(id))
-    const allProducts = await productClass.getAll()
-    res.json(allProducts)
-  }else{
-    res.json({"error":"No tienes permiso de administrador"})
-  }
+  const id = req.params.id
+  await productsClass.deleteById(parseInt(id))
+  const allProducts = await productsClass.getAll()
+  res.json(allProducts)
 })
 
 //Update a product by id
 routerProducts.put("/:id",async(req,res)=>{
-  if(isAdmin){
-    const id =  req.params.id
-    const product = await productClass.getById(parseInt(id))
-    product.actualizado = "Actualizado"
-    const allProducts = await productClass.getAll()
-    res.json(allProducts)
-  }else{
-    res.json({"error":"No tienes permiso de administrador"})
-  }
+  const id =  req.params.id
+  const product = await productsClass.getById(parseInt(id))
+  product.actualizado = "Actualizado"
+  const allProducts = await productsClass.getAll()
+  res.json(allProducts)
 })
 
 //Add a new item in routerProducts
-routerProducts.post("/", (req,res)=>{
-  if(isAdmin){
-    const title = req.body.title
-    const description = req.body.description
-    const price = req.body.price
-    const stock = req.body.stock
-    const image = req.body.image
-    const code = req.body.code
-    productClass.save({title,description,time:new Date().toLocaleTimeString(),price,stock,code,image})
-    const allProducts = productClass.getAll()
-    /*if(allProducts.length){
-      res.render("products",{allProducts})
-    }else{
-      res.render("productsEmpty")
-    }*/
-    res.json(allProducts)
-  }else{
-    res.json({"error":"No tienes permiso de administrador"})
-  }
+routerProducts.post("/" , async(req,res)=>{
+  const title = req.body.title
+  const price = req.body.price
+  const file = req.file
+  await productsClass.save({title,price,file})
 })
 
 //Get one item from the routerProducts
 routerProducts.get("/:id?",async(req,res)=>{
   const id = req.params.id
-  if(id){
-    const product = await productClass.getById(parseInt(id))
-    if(!product){
-      res.json({error:'producto no encontrado'})
-    }
-    res.json(product)
-  }else{
-    const allProducts = await productClass.getAll()
-    /*if(allProducts.length){
-      res.render("products",{allProducts})
-    }else{
-      res.render("productsEmpty")
-    }*/
-    res.json(allProducts)
+  const product = await productsClass.getById(parseInt(id))
+  if(!product){
+    res.json({error:'producto no encontrado'})
   }
 })
 
-
-
-
-routerCart.post("/",async(req,res)=>{
-  let id = await cartClass.createCart()
-  res.json(id)
-})
-
-routerCart.delete("/:id",async(req,res)=>{
-  await cartClass.deleteCart(parseInt(req.params.id))
-  res.json(await cartClass.getCart())
-})
-
-routerCart.get("/:id/productos",async(req,res)=>{
-  res.json(await cartClass.getCart())
-})
-
-routerCart.post("/:id/productos/:id_prod",async(req,res)=>{
-  let id_prod = req.params.id_prod
-  let id_cart = req.params.id
-  let product = await productClass.getById(parseInt(id_prod))
-  await cartClass.saveProduct(id_cart,product)
-  res.json(await cartClass.getCart())
+//Get all the products from the router class
+routerProducts.get("/",async(req,res)=>{
+  const allProducts = await productsClass.getAll()
+  res.render("products",{allProducts})
 })
 
 routerCart.delete("/:id/productos/:id_prod",async(req,res)=>{
