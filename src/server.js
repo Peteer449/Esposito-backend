@@ -1,10 +1,10 @@
 const express = require("express")
-const {Server} = require("socket.io")
 const path = require("path")
 const bodyParser = require("body-parser")
 const app = express()
 const handlebars = require("express-handlebars")
 
+const isAdmin = true
 
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(express.json())
@@ -50,6 +50,10 @@ app.get('/', (req, res) => {
   res.render("home")
 });
 
+app.get("*",(req,res) => {
+  res.json({"error":"Ruta no implementada"})
+})
+
 //Delete a product by id
 routerProducts.delete("/:id",async(req,res)=>{
   const id = req.params.id
@@ -76,13 +80,12 @@ routerProducts.post("/" , async(req,res)=>{
 })
 
 //Get one item from the routerProducts
-routerProducts.get("/:id",async(req,res)=>{
+routerProducts.get("/:id?",async(req,res)=>{
   const id = req.params.id
   const product = await productsClass.getById(parseInt(id))
   if(!product){
     res.json({error:'producto no encontrado'})
   }
-  res.json(product)
 })
 
 //Get all the products from the router class
@@ -91,5 +94,14 @@ routerProducts.get("/",async(req,res)=>{
   res.render("products",{allProducts})
 })
 
+routerCart.delete("/:id/productos/:id_prod",async(req,res)=>{
+  let id_prod = req.params.id_prod
+  let id_cart = req.params.id
+  await cartClass.deleteById(id_cart, id_prod)
+  res.json(await cartClass.getCart())
+})
+
+
 //Define the path of the router
 app.use("/api/productos", routerProducts)
+app.use("/api/carrito",routerCart)
